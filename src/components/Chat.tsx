@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Send, MessageSquare, X, User } from 'lucide-react';
-import { db, handleFirestoreError, OperationType } from '../firebase';
+import { db, handleFirestoreError, OperationType, auth } from '../firebase';
 import { collection, query, orderBy, limit, addDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { cn } from '../lib/utils';
@@ -28,21 +28,28 @@ export const Chat: React.FC<ChatProps> = ({ playerData }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const q = query(
-      collection(db, 'messages'),
-      orderBy('createdAt', 'asc'),
-      limit(50)
+    // Only subscribe to messages if authenticated
+    const unsubscribe = onSnapshot(
+      query(
+        collection(db, 'messages'),
+        orderBy('createdAt', 'asc'),
+        limit(50)
+      ),
+      { includeMetadataChanges: true },
+      (snapshot) => {
+        const msgs: Message[] = [];
+        snapshot.docs.forEach((doc) => {
+          msgs.push({ id: doc.id, ...doc.data({ serverTimestamps: 'estimate' }) } as Message);
+        });
+        setMessages(msgs);
+      },
+      (error) => {
+        // Only report if it's not a "missing permissions" error during initial load before auth
+        if (!error.message.includes('insufficient permissions')) {
+          handleFirestoreError(error, OperationType.LIST, 'messages');
+        }
+      }
     );
-
-    const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
-      const msgs: Message[] = [];
-      snapshot.docs.forEach((doc) => {
-        msgs.push({ id: doc.id, ...doc.data({ serverTimestamps: 'estimate' }) } as Message);
-      });
-      setMessages(msgs);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'messages');
-    });
 
     return () => unsubscribe();
   }, []);
@@ -55,7 +62,7 @@ export const Chat: React.FC<ChatProps> = ({ playerData }) => {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !playerData || isSending) return;
+    if (!newMessage.trim() || !playerData || isSending || !auth.currentUser) return;
 
     setIsSending(true);
     try {
@@ -64,7 +71,7 @@ export const Chat: React.FC<ChatProps> = ({ playerData }) => {
         senderName: playerData.name,
         senderAvatar: playerData.avatarIndex,
         createdAt: serverTimestamp(),
-        uid: 'temp-uid-' + playerData.name, // In a real app, use auth.currentUser.uid
+        uid: auth.currentUser.uid,
       });
       setNewMessage('');
     } catch (error) {

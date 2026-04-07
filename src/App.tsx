@@ -15,6 +15,7 @@ import { Chat } from './components/Chat';
 import { Screen } from './types';
 import { Home, Rss, Target, Settings, AlertTriangle } from 'lucide-react';
 import { cn } from './lib/utils';
+import { auth, signInAnonymously } from './firebase';
 
 export default function App() {
   const [error, setError] = React.useState<any>(null);
@@ -25,6 +26,11 @@ export default function App() {
 
   // Global error listener for Firebase/Async errors
   React.useEffect(() => {
+    // Sign in anonymously on load
+    signInAnonymously(auth).catch((err) => {
+      console.error('Anonymous sign-in failed:', err);
+    });
+
     const handleError = (event: PromiseRejectionEvent | ErrorEvent) => {
       const err = 'reason' in event ? event.reason : event.error;
       if (err?.message?.includes('{"error":')) {
