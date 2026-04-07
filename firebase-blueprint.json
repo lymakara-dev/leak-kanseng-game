@@ -1,0 +1,39 @@
+{
+  "entities": {
+    "Message": {
+      "title": "Message",
+      "description": "A chat message sent by a player",
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "The content of the message"
+        },
+        "senderName": {
+          "type": "string",
+          "description": "The name of the player who sent the message"
+        },
+        "senderAvatar": {
+          "type": "number",
+          "description": "The index of the avatar of the player who sent the message"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The time the message was sent"
+        },
+        "uid": {
+          "type": "string",
+          "description": "The unique ID of the sender"
+        }
+      },
+      "required": ["text", "senderName", "senderAvatar", "createdAt", "uid"]
+    }
+  },
+  "firestore": {
+    "/messages": {
+      "schema": "Message",
+      "description": "Global chat messages"
+    }
+  }
+}

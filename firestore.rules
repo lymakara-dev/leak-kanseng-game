@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: messages
+    // Document ID: auto-generated
+    // Fields:
+    //   - text: string (required, 1-500 chars) - The content of the message
+    //   - senderName: string (required, 1-50 chars) - The name of the player
+    //   - senderAvatar: number (required, 0-8) - The avatar index
+    //   - createdAt: timestamp (required) - The time the message was sent
+    //   - uid: string (required) - The unique ID of the sender
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['text', 'senderName', 'senderAvatar', 'createdAt', 'uid']) &&
+             data.keys().hasOnly(['text', 'senderName', 'senderAvatar', 'createdAt', 'uid']) &&
+             data.text is string && data.text.size() > 0 && data.text.size() <= 500 &&
+             data.senderName is string && data.senderName.size() > 0 && data.senderName.size() <= 50 &&
+             data.senderAvatar is number && data.senderAvatar >= 0 && data.senderAvatar <= 8 &&
+             data.createdAt is timestamp &&
+             data.uid == request.auth.uid;
+    }
+
+    match /messages/{messageId} {
+      // Anyone authenticated can read messages
+      allow read: if isAuthenticated();
+      
+      // Anyone authenticated can create a valid message
+      allow create: if isAuthenticated() && isValidMessage(request.resource.data);
+      
+      // Messages are immutable once sent
+      allow update, delete: if false;
+    }
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+  }
+}
